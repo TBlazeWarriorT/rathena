@@ -1742,6 +1742,15 @@ int32 clif_spawn( block_list *bl, bool walking ){
 	}
 
 	clif_hat_effects( *bl, AREA, *bl );
+	// Send visual effects after spawn completes
+	if (bl->type == BL_MOB) {
+		unit_data* ud = unit_bl2ud(bl);
+		if (ud != nullptr && !ud->visualEffects.empty()) {
+			for (size_t i = 0; i < ud->visualEffects.size(); i++) {
+				clif_specialeffect(bl, ud->visualEffects[i], AREA);
+			}
+		}
+	}
 
 	return 0;
 }
@@ -5111,6 +5120,15 @@ void clif_getareachar_unit( map_session_data* sd,block_list *bl ){
 	}
 
 	clif_hat_effects( *bl, SELF, *sd );
+	// Send visual effects when player enters view range
+	if (bl->type == BL_MOB) {
+		unit_data* ud = unit_bl2ud(bl);
+		if (ud != nullptr && !ud->visualEffects.empty()) {
+			for (size_t i = 0; i < ud->visualEffects.size(); i++) {
+				clif_specialeffect_single(bl, ud->visualEffects[i], sd->fd);
+			}
+		}
+	}
 }
 
 //Modifies the type of damage according to target status changes [Skotlex]

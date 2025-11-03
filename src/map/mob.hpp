@@ -280,6 +280,10 @@ struct s_mob_db {
 	int32 group_id;
 	std::string title;
 
+	// Permanent visual effects and hat effects
+	std::vector<int16> visual_effects;  // EF_* constants
+	std::vector<int16> hat_effects;     // HAT_EF_* constants
+
 	e_mob_bosstype get_bosstype();
 	s_mob_db();
 };

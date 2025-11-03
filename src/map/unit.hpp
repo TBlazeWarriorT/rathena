@@ -67,6 +67,7 @@ struct unit_data {
 
 	std::vector<int32> shadow_scar_timer;
 	std::vector<int16> hatEffects;
+	std::vector<int16> visualEffects;
 
 	// Functions and struct to calculate and store exact position at a certain tick
 	int16 getx(t_tick tick);

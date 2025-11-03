@@ -3489,6 +3489,7 @@ void unit_dataset(block_list *bl)
 	ud->sx = 8;
 	ud->sy = 8;
 	ud->hatEffects = {};
+	ud->visualEffects = {};
 }
 
 /**
@@ -4209,6 +4210,7 @@ int32 unit_free(block_list *bl, clr_type clrtype)
 
 	if( ud != nullptr ){
 		ud->hatEffects.clear();
+		ud->visualEffects.clear();
 	}
 
 	map_deliddb(bl);

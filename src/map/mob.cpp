@@ -9,6 +9,7 @@
 #include <map>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 
 #include <common/cbasetypes.hpp>
 #include <common/db.hpp>
@@ -85,6 +86,49 @@ std::unordered_map<uint32, std::shared_ptr<s_item_drop_list>> mob_looted_drops;
 MobSummonDatabase mob_summon_db;
 MobChatDatabase mob_chat_db;
 MapDropDatabase map_drop_db;
+
+// MobDB/MobAvail Effect/HatEffect parser helper
+// Helper function to parse Effects node for both MobDatabase and MobAvailDatabase
+static bool parseEffectsNode(
+	std::function<bool(const ryml::NodeRef&, const std::string&)> nodeExistsFn,
+	std::function<bool(const ryml::NodeRef&, const std::string&, std::string&)> asStringFn,
+	std::function<bool(const ryml::NodeRef&, const std::string&, bool&)> asBoolFn,
+	std::function<void(const ryml::NodeRef&, const std::string&)> invalidWarningFn,
+	const ryml::NodeRef& effectsNode,
+	std::vector<int16>& visual_effects,
+	std::vector<int16>& hat_effects
+) {
+	for (const auto& effectIt : effectsNode) {
+		std::string effect_name;
+		c4::from_chars(effectIt.key(), &effect_name);
+		
+		bool enabled;
+		if (!asBoolFn(effectsNode, effect_name, enabled)) {
+			return false;
+		}
+		
+		int64 constant;
+		
+		if (!script_get_constant(effect_name.c_str(), &constant)) {
+			invalidWarningFn(effectsNode, effect_name);
+			continue;
+		}
+		
+		int16 effect_id = static_cast<int16>(constant);
+		
+		// Check if it's a HatEffect/Footprint or EF_ Effect and enable/disable
+		std::vector<int16>* target_vector = (effect_name.find("HAT_EF_") == 0 || effect_name.find("FOOTPRINT_EF_") == 0) 
+											? &hat_effects 
+											: &visual_effects;
+		if (enabled) {
+			target_vector->push_back(effect_id);
+		} else {
+			util::vector_erase_if_exists(*target_vector, effect_id);
+		}
+	}
+	
+	return true;
+}
 
 /*==========================================
  * Local prototype declaration   (only required thing)
@@ -1213,6 +1257,24 @@ int32 mob_spawn (mob_data *md)
 	// MvP tomb [GreenBox]
 	if ( md->tomb_nid )
 		mvptomb_destroy(md);
+
+	// Copy permanent effects from database to unit
+	unit_data* ud = unit_bl2ud(md);
+	if (ud != nullptr) {
+		// Clear pre-respawn effects
+		ud->visualEffects.clear();
+		ud->hatEffects.clear();
+		
+		// Copy visual effects (EF_*)
+		for (size_t i = 0; i < md->db->visual_effects.size(); i++) {
+			ud->visualEffects.push_back(md->db->visual_effects[i]);
+		}
+		
+		// Copy hat effects (HAT_EF_*)
+		for (size_t i = 0; i < md->db->hat_effects.size(); i++) {
+			ud->hatEffects.push_back(md->db->hat_effects[i]);
+		}
+	}
 
 	if(map_addblock(md))
 		return 2;
@@ -4967,6 +5029,9 @@ s_mob_db::s_mob_db()
 	this->damagetaken = 100;
 	this->group_id = {};
 	this->title = {};
+
+	this->visual_effects = {};
+	this->hat_effects = {};
 }
 
 /**
@@ -5527,6 +5592,25 @@ uint64 MobDatabase::parseBodyNode(const ryml::NodeRef& node) {
 		if (!this->parseDropNode("Drops", node, MAX_MOB_DROP, mob->dropitem))
 			return 0;
 	}
+
+
+	// VISUAL EFFECTS
+	if (this->nodeExists(node, "Effects")) {
+		if (!parseEffectsNode(
+			[this](const ryml::NodeRef& n, const std::string& name) { return this->nodeExists(n, name); },
+			[this](const ryml::NodeRef& n, const std::string& name, std::string& out) { return this->asString(n, name, out); },
+			[this](const ryml::NodeRef& n, const std::string& name, bool& out) { return this->asBool(n, name, out); },
+			[this](const ryml::NodeRef& n, const std::string& effect_name) {
+				this->invalidWarning(n, "Unknown effect constant %s, skipping.\n", effect_name.c_str());
+			},
+			node["Effects"],
+			mob->visual_effects,
+			mob->hat_effects
+		)) {
+			return 0;
+		}
+	}
+	//
 
 	if (!exists)
 		this->put(mob_id, mob);
@@ -6198,6 +6282,24 @@ uint64 MobAvailDatabase::parseBodyNode(const ryml::NodeRef& node) {
 
 		mob->option &= ~(OPTION_HIDE | OPTION_CLOAK | OPTION_INVISIBLE | OPTION_CHASEWALK); // Remove hiding types
 	}
+
+	// VISUAL EFFECTS
+	if (this->nodeExists(node, "Effects")) {
+		if (!parseEffectsNode(
+			[this](const ryml::NodeRef& n, const std::string& name) { return this->nodeExists(n, name); },
+			[this](const ryml::NodeRef& n, const std::string& name, std::string& out) { return this->asString(n, name, out); },
+			[this](const ryml::NodeRef& n, const std::string& name, bool& out) { return this->asBool(n, name, out); },
+			[this](const ryml::NodeRef& n, const std::string& effect_name) {
+				this->invalidWarning(n, "Unknown effect constant %s, skipping.\n", effect_name.c_str());
+			},
+			node["Effects"],
+			mob->visual_effects,
+			mob->hat_effects
+		)) {
+			return 0;
+		}
+	}
+	//
 
 	return 1;
 }

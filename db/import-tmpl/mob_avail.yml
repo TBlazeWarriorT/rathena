@@ -37,6 +37,8 @@
 #   PetEquip                Item name of pet equipment (if Mob is a valid pet). (Default: 0)
 #   Options:                Set an option for an object. (Optional)
 #     <Option>: bool
+#   Effects:                List of EF_ or HAT_EF_ effects to apply to the mob. (Optional)
+#     <EF_constant>: true   EF_ or HAT_EF to enable.
 ###########################################################################
 
 Header:
